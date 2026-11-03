@@ -139,6 +139,7 @@
                 <div><span class="detail-icon rain-icon">♧</span><span>강수확률</span><strong id="current-rain-probability">--%</strong></div>
               </div>
               <p class="weather-source-note">Open-Meteo 모델 예보 · 관측소 실측값이 아닙니다.</p>
+              <p class="nearest-station-note" id="nearest-station-note">가장 가까운 기상청 관측소를 조회 중입니다.</p>
             </article>
 
             <article class="risk-card card">
@@ -237,7 +238,8 @@
                   <span>지도 SDK를 불러오고 있습니다.</span>
                 </div>
               </div>
-              <div class="map-legend"><span id="map-legend-title">기온</span><i class="legend-gradient"></i><span id="map-legend-range">데이터 대기 중</span><span class="map-legend-note">Open-Meteo 예보</span></div>
+              <div class="map-legend"><span id="map-legend-title">기온</span><i class="legend-gradient"></i><span id="map-legend-range">데이터 대기 중</span><span class="map-legend-note">Open-Meteo 모델 예보</span></div>
+              <p class="map-selection-note">지도를 누르면 해당 위치에서 가장 가까운 기상청 관측소의 실측자료를 확인합니다.</p>
             </article>
 
             <article class="hourly-card card section-card" id="hourly">
@@ -291,9 +293,9 @@
 
             <article class="accuracy-card card section-card" id="accuracy">
               <div class="section-header compact-header"><div><div class="section-kicker">FORECAST ACCURACY</div><h2>예보 정확도</h2></div></div>
-              <p class="accuracy-description">실제 관측과 과거 예보 자료가 모두 있어야 정확도를 계산할 수 있습니다.</p>
-              <div class="accuracy-unavailable">관측소 실측 및 과거 예보 이력이 연결되지 않아 정확도를 산출할 수 없습니다.</div>
-              <div class="accuracy-footnote">현재 제공되는 값은 Open-Meteo의 최신 모델 예보입니다. 실제 관측값으로 표시하지 않습니다.</div>
+              <p class="accuracy-description">실제 관측과 같은 시각·지역의 과거 예보 기록이 있어야 정확도를 계산할 수 있습니다.</p>
+              <div class="accuracy-unavailable">과거 예보 기록이 연결되지 않아 예보 정확도를 산출할 수 없습니다.</div>
+              <div class="accuracy-footnote">현재 관측소 실측과 실시간 예보는 제공하지만, 과거 예보 이력과 비교하는 기능은 제공하지 않습니다.</div>
             </article>
           </section>
           <footer class="page-footer"><span>하늘밭 농업 기상 플랫폼 · 자료 제공 <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">Open-Meteo</a></span><span>정확한 농작업 판단을 위해 현장 관측과 함께 활용하세요.</span></footer>
@@ -319,7 +321,7 @@
         <div class="gemini-dialog-actions">
           <button class="gemini-ask-button" id="ask-gemini" type="button"><span aria-hidden="true">✦</span> Gemini에게 질문하기</button>
         </div>
-        <p class="gemini-privacy-note">질문과 화면의 Open-Meteo 모델 예보가 답변 생성을 위해 Google Gemini로 전송됩니다. 내 위치를 선택하면 좌표도 포함될 수 있습니다. 모델 예보는 관측소 실측값이 아니므로 실제 작업 전 현장을 확인하세요.</p>
+        <p class="gemini-privacy-note">질문과 화면의 기상청 관측·예보 및 모델 예보가 답변 생성을 위해 Google Gemini로 전송됩니다. 내 위치나 지도에서 선택한 위치는 좌표·주소가 포함될 수 있습니다. 예보와 실측을 구분하고 실제 작업 전 현장을 확인하세요.</p>
       </form>
     </dialog>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>

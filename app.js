@@ -28,6 +28,9 @@ const windyCache = new Map();
 const windyRequests = new Map();
 const kmaCache = new Map();
 const kmaRequests = new Map();
+const stationCache = new Map();
+const stationRequests = new Map();
+const stationErrors = new Map();
 const OPEN_METEO_API = "https://api.open-meteo.com/v1/forecast";
 const WEATHER_CACHE_MS = 10 * 60 * 1000;
 let toastTimeout;
@@ -35,6 +38,7 @@ let weatherMap;
 let weatherOverlays = [];
 let selectedLocationKey = "gongju";
 let currentLocationWeather;
+let mapSelectionWeather;
 let currentPosition;
 let currentLocationOverlay;
 let currentLocationCircle;
@@ -151,6 +155,29 @@ async function fetchKmaForecast(location, force = false) {
   return request;
 }
 
+async function fetchKmaNearestStation(location, force = false) {
+  const key = locationCacheKey(location);
+  const cached = stationCache.get(key);
+  if (!force && cached && Date.now() - cached.fetchedAt < WEATHER_CACHE_MS) return cached.data;
+  if (!force && stationRequests.has(key)) return stationRequests.get(key);
+
+  const request = fetch("/api/kma-nearest-station", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ latitude: location.coordinates[0], longitude: location.coordinates[1] }),
+  }).then(async (response) => {
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || `가까운 관측소 요청 실패 (${response.status})`);
+    if (!result.station?.name || !result.observation?.time) {
+      throw new Error("가까운 관측소의 실측자료가 없습니다.");
+    }
+    stationCache.set(key, { data: result, fetchedAt: Date.now() });
+    return result;
+  }).finally(() => stationRequests.delete(key));
+  stationRequests.set(key, request);
+  return request;
+}
+
 function weatherDescription(code) {
   if (code === 0) return "맑음";
   if (code === 1) return "대체로 맑음";
@@ -230,7 +257,8 @@ function makeWeatherOverlay(locationKey, map) {
   element.type = "button";
   element.className = "weather-map-marker";
   element.setAttribute("aria-label", `${location.name} 기상정보`);
-  element.addEventListener("click", () => {
+  element.addEventListener("click", (event) => {
+    event.stopPropagation();
     if (selectedLocationKey === locationKey) return;
     const selector = document.querySelector("#location-select");
     selector.value = locationKey;
@@ -294,25 +322,20 @@ function getMapValue(forecast, field) {
 function initializeWeatherMap() {
   const kakao = window.kakao;
   const mapElement = document.querySelector("#kakao-map");
+  const selectedLocation = getLocationForKey(selectedLocationKey) || locations.gongju;
   weatherMap = new kakao.maps.Map(mapElement, {
-    center: currentPosition
-      ? new kakao.maps.LatLng(currentPosition.latitude, currentPosition.longitude)
-      : new kakao.maps.LatLng(36.05, 127.55),
-    level: currentPosition ? 8 : 11,
+    center: new kakao.maps.LatLng(...selectedLocation.coordinates),
+    level: 8,
   });
   weatherMap.addControl(new kakao.maps.ZoomControl(), kakao.maps.ControlPosition.RIGHT);
+  kakao.maps.event.addListener(weatherMap, "click", (mapEvent) => {
+    const position = mapEvent.latLng;
+    selectMapLocation(position.getLat(), position.getLng());
+  });
   weatherOverlays = Object.keys(locations).map((key) => makeWeatherOverlay(key, weatherMap));
   updateWeatherMap();
-  if (currentPosition) addCurrentLocationToMap();
-  if (!currentPosition) {
-    weatherMap.setBounds(
-      weatherOverlays.reduce((bounds, { key }) => {
-        bounds.extend(new kakao.maps.LatLng(...locations[key].coordinates));
-        return bounds;
-      }, new kakao.maps.LatLngBounds()),
-      34,
-    );
-  }
+  if (selectedLocationKey === "__current__" && currentPosition) addLocationToMap(currentLocationWeather, "내 위치", currentPosition.accuracy);
+  if (selectedLocationKey === "__map__" && mapSelectionWeather) addLocationToMap(mapSelectionWeather, "선택 위치");
   mapMessage.hidden = true;
 
   if ("ResizeObserver" in window) {
@@ -321,17 +344,21 @@ function initializeWeatherMap() {
   }
 }
 
-function addCurrentLocationToMap() {
-  if (!weatherMap || !currentPosition) return;
+function addLocationToMap(location, label, accuracy) {
+  if (!weatherMap || !location) return;
   const kakao = window.kakao;
-  const position = new kakao.maps.LatLng(currentPosition.latitude, currentPosition.longitude);
+  const position = new kakao.maps.LatLng(...location.coordinates);
 
   if (currentLocationOverlay) currentLocationOverlay.setMap(null);
   if (currentLocationCircle) currentLocationCircle.setMap(null);
 
   const marker = document.createElement("div");
   marker.className = "current-location-marker";
-  marker.innerHTML = '<span class="current-location-pulse"></span><strong>내 위치</strong>';
+  const pulse = document.createElement("span");
+  pulse.className = "current-location-pulse";
+  const title = document.createElement("strong");
+  title.textContent = label;
+  marker.append(pulse, title);
   currentLocationOverlay = new kakao.maps.CustomOverlay({
     position,
     content: marker,
@@ -340,10 +367,10 @@ function addCurrentLocationToMap() {
   });
   currentLocationOverlay.setMap(weatherMap);
 
-  if (Number.isFinite(currentPosition.accuracy) && currentPosition.accuracy > 0) {
+  if (Number.isFinite(accuracy) && accuracy > 0) {
     currentLocationCircle = new kakao.maps.Circle({
       center: position,
-      radius: Math.min(currentPosition.accuracy, 5000),
+      radius: Math.min(accuracy, 5000),
       strokeWeight: 1,
       strokeColor: "#4776e6",
       strokeOpacity: 0.7,
@@ -353,6 +380,24 @@ function addCurrentLocationToMap() {
     });
     currentLocationCircle.setMap(weatherMap);
   }
+}
+
+function getLocationForKey(key) {
+  if (key === "__current__") return currentLocationWeather;
+  if (key === "__map__") return mapSelectionWeather;
+  return locations[key];
+}
+
+function updateDynamicLocationOption(id, value, label) {
+  const selector = document.querySelector("#location-select");
+  let option = document.querySelector(`#${id}`);
+  if (!option) {
+    option = document.createElement("option");
+    option.id = id;
+    option.value = value;
+    selector.append(option);
+  }
+  option.textContent = label;
 }
 
 function reverseGeocode(latitude, longitude) {
@@ -390,23 +435,32 @@ async function setCurrentLocation(position, requestId) {
     city: "내 위치",
     coordinates: [latitude, longitude],
   };
-  document.querySelector("#location-status").textContent = `내 위치 · ${placeName}`;
-
-  let currentOption = document.querySelector("#current-location-option");
-  if (!currentOption) {
-    currentOption = document.createElement("option");
-    currentOption.id = "current-location-option";
-    currentOption.value = "__current__";
-    document.querySelector("#location-select").append(currentOption);
-  }
-  currentOption.textContent = currentLocationWeather.displayName;
+  updateDynamicLocationOption("current-location-option", "__current__", currentLocationWeather.displayName);
   const selector = document.querySelector("#location-select");
   selector.value = "__current__";
   selector.dispatchEvent(new Event("change", { bubbles: true }));
-  addCurrentLocationToMap();
 
   const accuracyText = Number.isFinite(accuracy) ? ` (정확도 약 ${Math.round(accuracy)}m)` : "";
-  showToast(`${placeName}${accuracyText}. 현재 좌표의 Open-Meteo 예보를 불러옵니다.`);
+  showToast(`${placeName}${accuracyText}. 가장 가까운 기상청 관측소를 찾습니다.`);
+}
+
+async function selectMapLocation(latitude, longitude) {
+  const requestId = ++locationRequestId;
+  const address = await reverseGeocode(latitude, longitude);
+  if (requestId !== locationRequestId) return;
+
+  const placeName = address || `위치 ${formatCoordinates(latitude, longitude)}`;
+  mapSelectionWeather = {
+    name: `지도 선택 · ${placeName}`,
+    displayName: `지도 선택 · ${placeName}`,
+    city: "선택 위치",
+    coordinates: [latitude, longitude],
+  };
+  updateDynamicLocationOption("map-location-option", "__map__", mapSelectionWeather.displayName);
+  const selector = document.querySelector("#location-select");
+  selector.value = "__map__";
+  selector.dispatchEvent(new Event("change", { bubbles: true }));
+  showToast(`${placeName}에서 가장 가까운 기상청 관측소를 찾습니다.`);
 }
 
 function handleLocationError(error, silent = false) {
@@ -473,7 +527,7 @@ function loadKakaoMap() {
     return;
   }
 
-  setMapMessage("카카오맵 연결 중", "지도와 실제 Open-Meteo 예보를 불러오고 있습니다.");
+  setMapMessage("카카오맵 연결 중", "지도를 표시하고 있습니다. 지도를 눌러 기상정보를 확인할 위치를 선택하세요.");
   let initialized = false;
   const loadTimeout = window.setTimeout(() => {
     if (!initialized) {
@@ -816,29 +870,45 @@ function convertWindToMetersPerSecond(value, unit) {
 }
 
 function convertTemperatureToCelsius(value, unit) {
-  if (unit === "°F" || unit === "F") return (value - 32) * 5 / 9;
+  const normalizedUnit = String(unit || "").trim().toLowerCase();
+  if (normalizedUnit === "k" || normalizedUnit === "°k" || normalizedUnit === "kelvin") {
+    return value - 273.15;
+  }
+  if (normalizedUnit === "°f" || normalizedUnit === "f" || normalizedUnit === "fahrenheit") {
+    return (value - 32) * 5 / 9;
+  }
   return value;
 }
 
-function renderCurrentWeather(location, data, kma) {
+function renderCurrentWeather(location, data, kma, nearestStation) {
   const { current, hourly } = data;
   const index = hourIndexNear(hourly.time, current.time);
   const kmaForecast = nearestKmaForecast(kma, current.time);
-  const observation = kma?.observation;
-  const temperature = observation?.temperature ?? current.temperature_2m;
-  const humidity = observation?.humidity ?? current.relative_humidity_2m;
-  const windSpeed = observation?.windSpeed ?? current.wind_speed_10m;
-  const windBearing = observation?.windDirection ?? current.wind_direction_10m;
+  const stationObservation = nearestStation?.observation;
+  const observation = stationObservation || kma?.observation;
+  const temperature = observation ? observation.temperature : current.temperature_2m;
+  const humidity = observation ? observation.humidity : current.relative_humidity_2m;
+  const windSpeed = observation ? observation.windSpeed : current.wind_speed_10m;
+  const windBearing = observation ? observation.windDirection : current.wind_direction_10m;
   const rainProbability = kmaForecast?.precipitationProbability ?? hourly.precipitation_probability[index];
   const selectionName = location.displayName || location.name;
   document.querySelector(".current-topline > span:first-child").textContent =
-    observation ? "기상청 초단기실황 · 실측" : "Open-Meteo 수치예보 모델";
+    stationObservation ? `기상청 ASOS 실측 · ${nearestStation.station.name}`
+      : observation ? "기상청 초단기실황 · 격자 관측" : "Open-Meteo 수치예보 모델";
   document.querySelector(".weather-date").textContent =
     `${selectionName} · ${formatDate(observation?.time || current.time, { month: "numeric", day: "numeric", weekday: "short", hour: "2-digit", minute: "2-digit" })}`;
   document.querySelector("#current-temperature").innerHTML = `${formatNumber(temperature)}<span>°C</span>`;
   const observedPrecipitationType = observation?.precipitationType;
-  document.querySelector("#current-condition").textContent = observation
-    ? ({ 1: "비", 2: "비/눈", 3: "눈", 4: "소나기" }[observedPrecipitationType] || "강수 없음")
+  document.querySelector("#current-condition").textContent = stationObservation
+    ? Number.isFinite(stationObservation.precipitation)
+      ? stationObservation.precipitation > 0 ? "강수 관측" : "강수 없음"
+      : "강수 자료 없음"
+    : observation
+      ? Number.isFinite(observedPrecipitationType)
+        ? observedPrecipitationType > 0
+          ? ({ 1: "비", 2: "비/눈", 3: "눈", 4: "소나기" }[observedPrecipitationType] || "강수 관측")
+          : "강수 없음"
+        : "상태 자료 없음"
     : weatherDescription(current.weather_code);
   const weatherIcon = document.querySelector(".sun-cloud");
   weatherIcon.hidden = Boolean(observation) || current.weather_code >= 45 || current.weather_code === 3;
@@ -856,25 +926,65 @@ function renderCurrentWeather(location, data, kma) {
   document.querySelector("#current-rain-probability").textContent = Number.isFinite(rainProbability)
     ? `${formatNumber(rainProbability, 0)}%`
     : "자료 없음";
+  const observedTime = observation?.time || current.time;
   document.querySelector("#current-date-label").textContent =
     new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "Asia/Seoul" })
-      .format(new Date(current.time)).toUpperCase();
+      .format(new Date(observedTime)).toUpperCase();
   document.querySelector("#location-status").textContent = selectionName;
-  document.querySelector("#updated-time").textContent = formatDate(current.time, { hour: "2-digit", minute: "2-digit" });
+  document.querySelector("#updated-time").textContent = formatDate(observedTime, { hour: "2-digit", minute: "2-digit" });
+  document.querySelector("#nearest-station-note").textContent = nearestStation
+    ? `가장 가까운 관측소: ${nearestStation.station.name} · 직선거리 ${formatNumber(nearestStation.station.distanceKm)}km · ${formatDate(stationObservation.time, { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })} 관측`
+    : stationErrors.has(locationCacheKey(location))
+      ? `가까운 관측소 자료 없음 · ${stationErrors.get(locationCacheKey(location))}`
+      : "가장 가까운 관측소를 조회 중입니다.";
   document.querySelector("#open-meteo-status").textContent = "연결됨";
   document.querySelector("#open-meteo-status").className = "status-ready";
-  document.querySelector(".weather-source-note").textContent = observation
-    ? "기상청 초단기실황 · 격자 기반 관측정보"
+  document.querySelector(".weather-source-note").textContent = stationObservation
+    ? "기온·습도·바람은 가까운 ASOS 실측, 강수확률은 선택 위치의 예보입니다."
+    : observation
+      ? "기상청 초단기실황 · 선택 좌표가 속한 격자의 대표 관측정보"
     : "Open-Meteo 모델 예보 · 관측소 실측값이 아닙니다.";
-  document.querySelector("#data-status-note").textContent = observation
-    ? "현재 기상청 초단기실황 · 예보 비교에 Open-Meteo/Windy 모델 사용"
+  document.querySelector("#data-status-note").textContent = stationObservation
+    ? "현재 가장 가까운 ASOS 관측소 실측 · 예보 비교에 KMA/Windy/Open-Meteo 사용"
+    : observation
+      ? "현재 기상청 격자 실황 · 예보 비교에 KMA/Windy/Open-Meteo 사용"
     : "Open-Meteo 모델 예보 · 관측소 실측값 아님";
   document.querySelector("#open-meteo-provider-status").textContent = "연결됨";
+}
+
+function renderStationObservation(location, nearestStation) {
+  const { station, observation } = nearestStation;
+  document.querySelector(".current-topline > span:first-child").textContent = `기상청 ASOS 실측 · ${station.name}`;
+  document.querySelector(".weather-date").textContent =
+    `${location.displayName || location.name} · ${formatDate(observation.time, { month: "numeric", day: "numeric", weekday: "short", hour: "2-digit", minute: "2-digit" })}`;
+  document.querySelector("#current-temperature").innerHTML = `${formatNumber(observation.temperature)}<span>°C</span>`;
+  document.querySelector("#current-condition").textContent = Number.isFinite(observation.precipitation)
+    ? observation.precipitation > 0 ? "강수 관측" : "강수 없음"
+    : "강수 자료 없음";
+  document.querySelector(".sun-cloud").hidden = true;
+  document.querySelector("#current-apparent-temperature").textContent = "기상청 자료 없음";
+  document.querySelector("#current-humidity").textContent = Number.isFinite(observation.humidity)
+    ? `${formatNumber(observation.humidity, 0)}%`
+    : "자료 없음";
+  const direction = windDirection(observation.windDirection);
+  document.querySelector("#current-wind").textContent =
+    `${formatNumber(observation.windSpeed)} m/s${direction ? ` ${direction}` : ""}`;
+  document.querySelector("#current-rain-probability").textContent = "예보 자료 없음";
+  document.querySelector("#current-date-label").textContent =
+    new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "Asia/Seoul" })
+      .format(new Date(observation.time)).toUpperCase();
+  document.querySelector("#location-status").textContent = location.displayName || location.name;
+  document.querySelector("#updated-time").textContent = formatDate(observation.time, { hour: "2-digit", minute: "2-digit" });
+  document.querySelector("#nearest-station-note").textContent =
+    `가장 가까운 관측소: ${station.name} · 직선거리 ${formatNumber(station.distanceKm)}km · ${formatDate(observation.time, { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })} 관측`;
+  document.querySelector(".weather-source-note").textContent = "기상청 ASOS 관측소 실측자료 · 예보 자료는 연결되지 않았습니다.";
+  document.querySelector("#data-status-note").textContent = "가장 가까운 기상청 ASOS 관측소 실측 · 모델 예보를 불러오지 못했습니다.";
 }
 
 function setWeatherLoading(location) {
   document.querySelector("#location-status").textContent = `${location.displayName || location.name} · 예보 불러오는 중`;
   document.querySelector(".current-topline > span:first-child").textContent = "Open-Meteo 연결 중";
+  document.querySelector("#nearest-station-note").textContent = "가장 가까운 기상청 관측소를 조회 중입니다.";
   document.querySelector(".weather-date").textContent = "예보 불러오는 중";
   document.querySelector("#current-temperature").innerHTML = "--<span>°C</span>";
   document.querySelector("#current-condition").textContent = "불러오는 중";
@@ -922,11 +1032,37 @@ function setWeatherLoading(location) {
 
 async function loadLocationWeather(location, key = selectedLocationKey, force = false) {
   const requestId = ++weatherRequestId;
+  const cacheKey = locationCacheKey(location);
+  stationErrors.delete(cacheKey);
   setWeatherLoading(location);
+  const stationPromise = fetchKmaNearestStation(location, force).then((nearestStation) => {
+    if (requestId !== weatherRequestId || key !== selectedLocationKey) return null;
+    const data = weatherCache.get(cacheKey)?.data;
+    if (data) {
+      renderCurrentWeather(location, data, kmaCache.get(cacheKey)?.data, nearestStation);
+    } else {
+      renderStationObservation(location, nearestStation);
+    }
+    return nearestStation;
+  }).catch((error) => {
+    if (requestId !== weatherRequestId || key !== selectedLocationKey) return null;
+    console.error("가장 가까운 기상청 관측소 자료를 불러오지 못했습니다.", error);
+    stationErrors.set(cacheKey, error.message);
+    document.querySelector("#nearest-station-note").textContent = `가장 가까운 관측소 자료 없음 · ${error.message}`;
+    return null;
+  });
   try {
     const data = await fetchWeather(location, force);
-    if (requestId !== weatherRequestId || key !== selectedLocationKey) return;
-    renderCurrentWeather(location, data);
+    if (requestId !== weatherRequestId || key !== selectedLocationKey) {
+      await stationPromise;
+      return;
+    }
+    renderCurrentWeather(
+      location,
+      data,
+      kmaCache.get(locationCacheKey(location))?.data,
+      stationCache.get(locationCacheKey(location))?.data,
+    );
     renderMetrics(data);
     renderProviderComparison(data);
     renderHourlyForecast(data);
@@ -936,7 +1072,7 @@ async function loadLocationWeather(location, key = selectedLocationKey, force = 
     const sourceRequests = [
       fetchKmaForecast(location, force).then((kma) => {
         if (requestId !== weatherRequestId || key !== selectedLocationKey) return;
-        renderCurrentWeather(location, data, kma);
+        renderCurrentWeather(location, data, kma, stationCache.get(locationCacheKey(location))?.data);
         renderProviderComparison(data, kma, windyCache.get(locationCacheKey(location))?.data);
       }).catch((error) => {
         if (requestId !== weatherRequestId || key !== selectedLocationKey) return;
@@ -945,6 +1081,7 @@ async function loadLocationWeather(location, key = selectedLocationKey, force = 
         document.querySelector("#kma-status").className = "status-unavailable";
         document.querySelector(".kma-card .provider-condition").textContent = error.message;
       }),
+      stationPromise,
       fetchWindyForecast(location, force).then((windy) => {
         if (requestId !== weatherRequestId || key !== selectedLocationKey) return;
         renderProviderComparison(data, kmaCache.get(locationCacheKey(location))?.data, windy);
@@ -963,13 +1100,20 @@ async function loadLocationWeather(location, key = selectedLocationKey, force = 
   } catch (error) {
     if (requestId !== weatherRequestId || key !== selectedLocationKey) return;
     console.error("Open-Meteo 예보를 불러오지 못했습니다.", error);
-    document.querySelector("#location-status").textContent = "예보를 불러오지 못했습니다";
+    const hasStationObservation = stationCache.has(cacheKey);
+    document.querySelector("#location-status").textContent = hasStationObservation
+      ? `${location.displayName || location.name} · 일부 예보 연결 실패`
+      : "예보를 불러오지 못했습니다";
     document.querySelector("#open-meteo-status").textContent = "연결 실패";
     document.querySelector("#open-meteo-status").className = "status-unavailable";
     document.querySelector("#open-meteo-provider-status").textContent = "연결 실패";
-    document.querySelector("#data-status-note").textContent = "네트워크 상태를 확인한 뒤 새로고침해 주세요.";
-    document.querySelector(".weather-date").textContent = "예보 자료 없음";
-    document.querySelector("#current-condition").textContent = "예보 자료 없음";
+    document.querySelector("#data-status-note").textContent = hasStationObservation
+      ? "기상청 ASOS 실측자료 표시 중 · 모델 예보를 불러오지 못했습니다."
+      : "네트워크 상태를 확인한 뒤 새로고침해 주세요.";
+    if (!hasStationObservation) {
+      document.querySelector(".weather-date").textContent = "예보 자료 없음";
+      document.querySelector("#current-condition").textContent = "예보 자료 없음";
+    }
     document.querySelector("#insight-title").textContent = "예보 자료를 불러오지 못했습니다";
     document.querySelector("#insight-description").textContent = "인터넷 연결을 확인하고 새로고침해 주세요. 예시 자료로 대체하지 않습니다.";
     document.querySelector(".hourly-conditions").textContent = "시간별 예보를 불러오지 못했습니다.";
@@ -1153,9 +1297,10 @@ ${question || "질문을 입력해 주세요."}
 - 현재 주요 정보 기준: ${readText(currentWeather?.querySelector(".current-topline"))}
 - 현재 날씨 기준: ${readText(currentWeather?.querySelector(".weather-date"))}
 - 현재 상태: ${readText(currentWeather?.querySelector(".current-temp > span"))}, 기온 ${readText(currentWeather?.querySelector("#current-temperature"))}, 습도 ${readText(currentWeather?.querySelector("#current-humidity"))}, 바람 ${readText(currentWeather?.querySelector("#current-wind"))}, 강수확률 ${readText(currentWeather?.querySelector(".current-details > div:last-child strong"))}
-- 내 위치를 선택한 경우 해당 좌표를 직접 조회합니다.
+- 가장 가까운 관측소: ${readText(currentWeather?.querySelector("#nearest-station-note"))}
+- 내 위치 또는 지도 위치를 선택하면 해당 좌표 기준의 가장 가까운 기상청 관측소를 조회합니다.
 - 데이터 연결 상태: ${dataNotice}
-- 중요: 아래 기상 수치는 Open-Meteo 수치예보 모델에서 가져온 실제 예보 자료이며, 농장 현장이나 관측소의 실측값은 아닙니다. 관측 사실로 오해되지 않도록 '모델 예보'임을 밝히고, 현장 관측과 공식 예보를 함께 확인하도록 안내하세요.
+- 중요: 현재 날씨는 가장 가까운 ASOS 관측소 또는 기상청 격자 실황의 실측자료이고, 시간·주간 예보와 지역별 지도 값은 Open-Meteo 모델 예보입니다. 기관별 비교에는 기상청·Windy 예보도 포함되며, 관측자료의 지점·거리·시각과 예보 출처를 구분하세요. 모든 자료를 농장 현장 실측으로 오해하지 않도록 안내하세요.
 
 [주요 기상 지표]
 ${metrics.join("\n")}
@@ -1231,7 +1376,7 @@ geminiAskButton.addEventListener("click", async () => {
     return;
   }
 
-  const selectedLocation = selectedLocationKey === "__current__" ? currentLocationWeather : locations[selectedLocationKey];
+  const selectedLocation = getLocationForKey(selectedLocationKey);
   if (!selectedLocation || !weatherCache.has(locationCacheKey(selectedLocation))) {
     showToast("실제 기상 예보를 불러온 뒤 질문해 주세요.");
     return;
@@ -1269,8 +1414,9 @@ geminiAskButton.addEventListener("click", async () => {
 });
 
 document.querySelector("#location-select").addEventListener("change", (event) => {
-  const isCurrentLocation = event.target.value === "__current__" && currentLocationWeather;
-  const selectedLocation = isCurrentLocation ? currentLocationWeather : locations[event.target.value];
+  const isCurrentLocation = event.target.value === "__current__";
+  const isMapSelection = event.target.value === "__map__";
+  const selectedLocation = getLocationForKey(event.target.value);
   if (!selectedLocation) return;
 
   if (!isCurrentLocation) {
@@ -1283,6 +1429,12 @@ document.querySelector("#location-select").addEventListener("change", (event) =>
   loadLocationWeather(selectedLocation, selectedLocationKey);
   updateWeatherMap();
   if (weatherMap) {
+    if (isCurrentLocation) addLocationToMap(selectedLocation, "내 위치", currentPosition?.accuracy);
+    else if (isMapSelection) addLocationToMap(selectedLocation, "선택 위치");
+    else {
+      if (currentLocationOverlay) currentLocationOverlay.setMap(null);
+      if (currentLocationCircle) currentLocationCircle.setMap(null);
+    }
     weatherMap.panTo(new window.kakao.maps.LatLng(...selectedLocation.coordinates));
     weatherMap.setLevel(8);
   }
@@ -1294,7 +1446,7 @@ document.querySelector("#refresh-button").addEventListener("click", (event) => {
   const button = event.currentTarget;
   button.disabled = true;
   button.classList.add("is-refreshing");
-  const location = selectedLocationKey === "__current__" ? currentLocationWeather : locations[selectedLocationKey];
+  const location = getLocationForKey(selectedLocationKey);
   Promise.all([
     loadLocationWeather(location, selectedLocationKey, true),
     ...Object.values(locations).map((region) => fetchWeather(region, true).then(updateWeatherMap)),
