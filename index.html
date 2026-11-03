@@ -328,20 +328,21 @@
         <div class="gemini-dialog-header">
           <div>
             <div class="section-kicker">AI FARM ADVISOR</div>
-            <h2 id="gemini-dialog-title">기상정보를 모아 Gemini에 질문</h2>
-            <p>질문에 현재 대시보드의 예보와 농작업 정보를 함께 넣어 프롬프트를 만들어요.</p>
+            <h2 id="gemini-dialog-title">기상정보를 바탕으로 Gemini에 질문</h2>
+            <p>현재 화면의 기상정보와 질문을 종합해 Gemini가 답변합니다.</p>
           </div>
           <button class="gemini-close" value="close" aria-label="닫기">×</button>
         </div>
         <label class="gemini-question-label" for="gemini-question">무엇이 궁금하신가요?</label>
         <textarea id="gemini-question" class="gemini-question" rows="2" maxlength="500">오늘 토마토 농장에서 덮개를 덮을까?</textarea>
-        <div class="gemini-prompt-heading"><strong>Gemini에 전달할 프롬프트</strong><span>현재 대시보드 정보를 자동으로 포함합니다</span></div>
-        <textarea id="gemini-prompt" class="gemini-prompt" rows="10" readonly aria-label="생성된 Gemini 프롬프트"></textarea>
-        <div class="gemini-dialog-actions">
-          <button class="gemini-copy-button" id="copy-gemini-prompt" type="button">프롬프트 복사</button>
-          <a class="gemini-open-link" href="https://gemini.google.com/app" target="_blank" rel="noopener noreferrer">Gemini 열기 <span aria-hidden="true">↗</span></a>
+        <div class="gemini-answer" id="gemini-answer" role="status" aria-live="polite" hidden>
+          <div class="gemini-answer-heading"><span class="gemini-sparkle" aria-hidden="true">✦</span><strong>Gemini 답변</strong></div>
+          <div class="gemini-answer-content" id="gemini-answer-content"></div>
         </div>
-        <p class="gemini-privacy-note">프롬프트는 이 브라우저에서 생성되며, 복사 버튼을 눌러야 클립보드에 복사됩니다. 현재 화면은 예시 데이터이므로 실제 작업 전 현장 기상과 작물 상태를 확인하세요.</p>
+        <div class="gemini-dialog-actions">
+          <button class="gemini-ask-button" id="ask-gemini" type="button"><span aria-hidden="true">✦</span> Gemini에게 질문하기</button>
+        </div>
+        <p class="gemini-privacy-note">질문과 화면에 표시된 기상정보가 답변 생성을 위해 Google Gemini로 전송됩니다. 내 위치를 선택한 경우 지역명 또는 좌표도 포함될 수 있습니다. 기상정보는 API 연결 전 예시값이므로 실제 작업 전 현장과 최신 예보를 확인하세요.</p>
       </form>
     </dialog>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>

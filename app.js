@@ -618,36 +618,64 @@ ${accuracy.join("\n")}
 
 const geminiDialog = document.querySelector("#gemini-dialog");
 const geminiQuestion = document.querySelector("#gemini-question");
-const geminiPrompt = document.querySelector("#gemini-prompt");
-
-function refreshGeminiPrompt() {
-  geminiPrompt.value = createGeminiPrompt(geminiQuestion.value.trim());
-}
+const geminiAnswer = document.querySelector("#gemini-answer");
+const geminiAnswerContent = document.querySelector("#gemini-answer-content");
+const geminiAskButton = document.querySelector("#ask-gemini");
 
 document.querySelector("#open-gemini-dialog").addEventListener("click", () => {
-  refreshGeminiPrompt();
+  geminiAnswer.hidden = true;
+  geminiAnswerContent.textContent = "";
   geminiDialog.showModal();
   geminiQuestion.focus();
 });
 
-geminiQuestion.addEventListener("input", refreshGeminiPrompt);
+geminiQuestion.addEventListener("input", () => {
+  geminiAnswer.hidden = true;
+});
 
-document.querySelector("#copy-gemini-prompt").addEventListener("click", async () => {
-  refreshGeminiPrompt();
+geminiQuestion.addEventListener("keydown", (event) => {
+  if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+    event.preventDefault();
+    geminiAskButton.click();
+  }
+});
+
+geminiAskButton.addEventListener("click", async () => {
+  const question = geminiQuestion.value.trim();
+  if (!question) {
+    geminiQuestion.focus();
+    showToast("궁금한 내용을 먼저 입력해 주세요.");
+    return;
+  }
+
+  geminiAskButton.disabled = true;
+  geminiAskButton.innerHTML = '<span class="gemini-loading" aria-hidden="true"></span> 답변을 기다리는 중';
+  geminiAnswer.hidden = false;
+  geminiAnswerContent.textContent = "대시보드 기상정보를 확인해 Gemini가 답변을 작성하고 있습니다.";
+  geminiAnswerContent.classList.add("is-loading");
+
   try {
-    await navigator.clipboard.writeText(geminiPrompt.value);
-    showToast("기상정보를 포함한 Gemini 프롬프트를 복사했습니다.");
-  } catch (error) {
-    geminiPrompt.focus();
-    geminiPrompt.select();
-    const copied = document.execCommand("copy");
-    geminiPrompt.setSelectionRange(0, 0);
-    if (copied) {
-      showToast("프롬프트를 복사했습니다. Gemini에 붙여넣어 질문하세요.");
-    } else {
-      console.error("Gemini 프롬프트 복사에 실패했습니다.", error);
-      showToast("복사하지 못했습니다. 프롬프트를 선택해 직접 복사해 주세요.");
+    const response = await fetch("/api/ask-gemini", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question, prompt: createGeminiPrompt(question) }),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(result.error || "Gemini 답변을 가져오지 못했습니다. 잠시 후 다시 시도해 주세요.");
     }
+    if (typeof result.answer !== "string" || !result.answer.trim()) {
+      throw new Error("Gemini에서 답변을 받지 못했습니다. 질문을 바꿔 다시 시도해 주세요.");
+    }
+    geminiAnswerContent.textContent = result.answer.trim();
+    geminiAnswerContent.classList.remove("is-loading");
+  } catch (error) {
+    console.error("Gemini 답변 요청에 실패했습니다.", error);
+    geminiAnswerContent.textContent = error.message || "Gemini에 연결할 수 없습니다. 네트워크 상태를 확인하고 다시 시도해 주세요.";
+    geminiAnswerContent.classList.remove("is-loading");
+  } finally {
+    geminiAskButton.disabled = false;
+    geminiAskButton.innerHTML = '<span aria-hidden="true">✦</span> 다시 질문하기';
   }
 });
 
