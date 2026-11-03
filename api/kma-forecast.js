@@ -1,7 +1,7 @@
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX_REQUESTS = 30;
 const REQUEST_TIMEOUT_MS = 20_000;
-const KMA_API_BASE = "https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0";
+const KMA_API_BASE = "https://apihub.kma.go.kr/api/typ02/openApi/VilageFcstInfoService_2.0";
 const requestCounts = new Map();
 
 function sendError(response, status, message) {
@@ -84,7 +84,7 @@ function gridCoordinates(latitude, longitude) {
 async function fetchKmaItems(endpoint, parameters, serviceKey, signal) {
   const url = new URL(`${KMA_API_BASE}/${endpoint}`);
   Object.entries({
-    serviceKey,
+    authKey: serviceKey,
     dataType: "JSON",
     numOfRows: "1000",
     pageNo: "1",
@@ -92,11 +92,18 @@ async function fetchKmaItems(endpoint, parameters, serviceKey, signal) {
   }).forEach(([key, value]) => url.searchParams.set(key, String(value)));
 
   const response = await fetch(url, { signal });
-  if (!response.ok) throw new Error(`KMA API returned HTTP ${response.status}`);
-  const result = await response.json();
+  const body = await response.text();
+  if (!response.ok) throw new Error(`KMA_API_ERROR:HTTP ${response.status}:${body.slice(0, 120).replace(/authKey=[^&\s]+/gi, "authKey=***")}`);
+  let result;
+  try {
+    result = JSON.parse(body);
+  } catch {
+    throw new Error(`KMA_API_ERROR:FORMAT:${body.slice(0, 120).replace(/authKey=[^&\s]+/gi, "authKey=***")}`);
+  }
   const header = result.response?.header;
-  if (header?.resultCode === "03") return [];
-  if (header?.resultCode !== "00") {
+  const resultCode = String(header?.resultCode ?? "").padStart(2, "0");
+  if (resultCode === "03") return [];
+  if (resultCode !== "00") {
     const code = String(header?.resultCode || "UNKNOWN");
     const message = String(header?.resultMsg || "an invalid response");
     throw new Error(`KMA_API_ERROR:${code}:${message}`);
@@ -190,7 +197,7 @@ module.exports = async function handler(request, response) {
     return sendError(response, 400, "위도·경도 좌표가 올바르지 않습니다.");
   }
 
-  const configuredServiceKey = process.env.KMA_SERVICE_KEY;
+  const configuredServiceKey = process.env.KMA_AUTH_KEY || process.env.KMA_SERVICE_KEY;
   const serviceKey = configuredServiceKey ? normalizeServiceKey(configuredServiceKey) : "";
   if (!serviceKey) {
     return sendError(response, 503, "기상청 단기예보 API 서비스 키가 설정되지 않았습니다.");
@@ -234,7 +241,7 @@ module.exports = async function handler(request, response) {
         return sendError(response, 502, `기상청 인증 오류 (${code}). 서비스 키 형식과 단기예보 API 활용 승인을 확인해 주세요.`);
       }
       console.error("KMA forecast API returned an error.", { code, message });
-      return sendError(response, 502, `기상청 API 오류 (${code}). 잠시 후 다시 시도해 주세요.`);
+      return sendError(response, 502, `기상청 API 오류 (${code}): ${message.slice(0, 80)}`);
     }
     console.error("KMA forecast request failed.", error.message);
     return sendError(response, 502, "기상청 예보 서비스에 연결하지 못했습니다. 서비스 키와 API 활용 승인을 확인해 주세요.");
