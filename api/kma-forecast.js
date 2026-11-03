@@ -8,6 +8,12 @@ function sendError(response, status, message) {
   return response.status(status).json({ error: message });
 }
 
+function normalizeServiceKey(serviceKey) {
+  const trimmedKey = serviceKey.trim();
+  if (!/%[0-9a-f]{2}/i.test(trimmedKey)) return trimmedKey;
+  return decodeURIComponent(trimmedKey);
+}
+
 function isRateLimited(request) {
   const clientIp = request.headers["x-real-ip"]
     || request.headers["x-forwarded-for"]?.split(",")[0]?.trim()
@@ -91,7 +97,9 @@ async function fetchKmaItems(endpoint, parameters, serviceKey, signal) {
   const header = result.response?.header;
   if (header?.resultCode === "03") return [];
   if (header?.resultCode !== "00") {
-    throw new Error(`KMA API returned ${header?.resultCode || "an invalid response"}`);
+    const code = String(header?.resultCode || "UNKNOWN");
+    const message = String(header?.resultMsg || "an invalid response");
+    throw new Error(`KMA_API_ERROR:${code}:${message}`);
   }
   const items = result.response?.body?.items?.item;
   return Array.isArray(items) ? items : items ? [items] : [];
@@ -182,7 +190,8 @@ module.exports = async function handler(request, response) {
     return sendError(response, 400, "위도·경도 좌표가 올바르지 않습니다.");
   }
 
-  const serviceKey = process.env.KMA_SERVICE_KEY;
+  const configuredServiceKey = process.env.KMA_SERVICE_KEY;
+  const serviceKey = configuredServiceKey ? normalizeServiceKey(configuredServiceKey) : "";
   if (!serviceKey) {
     return sendError(response, 503, "기상청 단기예보 API 서비스 키가 설정되지 않았습니다.");
   }
@@ -217,6 +226,15 @@ module.exports = async function handler(request, response) {
   } catch (error) {
     if (error.name === "AbortError") {
       return sendError(response, 504, "기상청 예보 요청 시간이 초과되었습니다.");
+    }
+    const apiError = error.message.match(/^KMA_API_ERROR:([^:]+):(.*)$/);
+    if (apiError) {
+      const [, code, message] = apiError;
+      if (["20", "21", "30", "31", "32", "33"].includes(code)) {
+        return sendError(response, 502, `기상청 인증 오류 (${code}). 서비스 키 형식과 단기예보 API 활용 승인을 확인해 주세요.`);
+      }
+      console.error("KMA forecast API returned an error.", { code, message });
+      return sendError(response, 502, `기상청 API 오류 (${code}). 잠시 후 다시 시도해 주세요.`);
     }
     console.error("KMA forecast request failed.", error.message);
     return sendError(response, 502, "기상청 예보 서비스에 연결하지 못했습니다. 서비스 키와 API 활용 승인을 확인해 주세요.");

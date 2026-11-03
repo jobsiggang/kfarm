@@ -144,6 +144,9 @@ async function fetchKmaForecast(location, force = false) {
     body: JSON.stringify({ latitude: location.coordinates[0], longitude: location.coordinates[1] }),
   }).then(async (response) => {
     const result = await response.json().catch(() => ({}));
+    if (response.status === 501) {
+      throw new Error("현재 정적 웹 서버에는 기상청 서버 API가 없습니다. Vercel 개발 서버(vercel dev) 또는 Vercel 배포 주소에서 실행하세요.");
+    }
     if (!response.ok) throw new Error(result.error || `기상청 요청 실패 (${response.status})`);
     if (!Array.isArray(result.forecast) || !result.forecast.length) {
       throw new Error("기상청 응답에 시간별 예보 자료가 없습니다.");
@@ -1077,8 +1080,16 @@ async function loadLocationWeather(location, key = selectedLocationKey, force = 
       }).catch((error) => {
         if (requestId !== weatherRequestId || key !== selectedLocationKey) return;
         console.error("기상청 실황·예보를 불러오지 못했습니다.", error);
-        document.querySelector("#kma-status").textContent = "미연결";
+        const status = error.message.includes("정적 웹 서버")
+          ? "Vercel 서버 필요"
+          : error.message.includes("서비스 키가 설정되지 않았습니다")
+            ? "키 미설정"
+            : error.message.includes("인증 오류")
+              ? "키·승인 확인"
+              : "미연결";
+        document.querySelector("#kma-status").textContent = status;
         document.querySelector("#kma-status").className = "status-unavailable";
+        document.querySelector(".kma-card .provider-live").textContent = status;
         document.querySelector(".kma-card .provider-condition").textContent = error.message;
       }),
       stationPromise,
