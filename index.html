@@ -63,14 +63,14 @@
         <div class="sidebar-spacer"></div>
         <div class="sidebar-status">
           <span class="status-heading"><span class="live-dot"></span> 데이터 연결 상태</span>
-          <div class="provider-status"><span class="provider-mini kma-mini">K</span><span>기상청</span><span class="status-ready">준비</span></div>
-          <div class="provider-status"><span class="provider-mini windy-mini">W</span><span>Windy</span><span class="status-ready">준비</span></div>
-          <div class="provider-status"><span class="provider-mini om-mini">M</span><span>Open-Meteo</span><span class="status-ready">준비</span></div>
-          <p>현재는 화면 설계용 예시 데이터입니다.</p>
+          <div class="provider-status"><span class="provider-mini kma-mini">K</span><span>기상청</span><span class="status-loading" id="kma-status">연결 확인 중</span></div>
+          <div class="provider-status"><span class="provider-mini windy-mini">W</span><span>Windy</span><span class="status-loading" id="windy-status">연결 확인 중</span></div>
+          <div class="provider-status"><span class="provider-mini om-mini">M</span><span>Open-Meteo</span><span class="status-loading" id="open-meteo-status">연결 중</span></div>
+          <p id="data-status-note">실제 예보 데이터를 불러오고 있습니다.</p>
         </div>
         <div class="sidebar-footer">
           <span class="avatar">농</span>
-          <span class="profile-copy"><strong>농장 관리자</strong><small>충남 공주 농장</small></span>
+          <span class="profile-copy"><strong>농장 관리자</strong><small>선택 지역 기상정보</small></span>
           <button class="more-button" aria-label="계정 메뉴">···</button>
         </div>
       </aside>
@@ -94,9 +94,9 @@
         <div class="content-wrap">
           <section class="page-heading">
             <div>
-              <div class="eyebrow"><span class="eyebrow-line"></span> TUESDAY, NOVEMBER 3</div>
+              <div class="eyebrow"><span class="eyebrow-line"></span> <span id="current-date-label">실제 기상 예보</span></div>
               <h1>우리 농장 날씨</h1>
-              <p>기상청 예보와 내 위치를 확인하세요.</p>
+              <p>기상청 실황·예보와 Windy 정보를 확인하세요.</p>
             </div>
             <div class="location-controls">
               <label class="location-select">
@@ -126,29 +126,29 @@
 
           <section class="overview-grid" aria-label="현재 기상 요약">
             <article class="current-weather card">
-              <div class="current-topline"><span>기상청 예보 · 예시</span><span class="weather-date">11월 3일 (화) · 11:00</span></div>
+              <div class="current-topline"><span>Open-Meteo 예보 모델</span><span class="weather-date">불러오는 중</span></div>
               <div class="current-weather-main">
                 <div class="sun-cloud" aria-hidden="true"><span class="sun-disc"></span><span class="cloud-shape"></span></div>
-                <div class="current-temp"><strong id="current-temperature">18.5<span>°C</span></strong><span>구름 조금</span></div>
-                <div class="feels-like">체감 <strong>18°</strong></div>
+                <div class="current-temp"><strong id="current-temperature">--<span>°C</span></strong><span id="current-condition">불러오는 중</span></div>
+                <div class="feels-like">체감 <strong id="current-apparent-temperature">--°</strong></div>
               </div>
               <div class="current-divider"></div>
               <div class="current-details">
-                <div><span class="detail-icon humidity-icon">◌</span><span>습도</span><strong id="current-humidity">65%</strong></div>
-                <div><span class="detail-icon wind-icon">≋</span><span>바람</span><strong id="current-wind">2.4 m/s</strong></div>
-                <div><span class="detail-icon rain-icon">♧</span><span>강수확률</span><strong>20%</strong></div>
+                <div><span class="detail-icon humidity-icon">◌</span><span>습도</span><strong id="current-humidity">--%</strong></div>
+                <div><span class="detail-icon wind-icon">≋</span><span>바람</span><strong id="current-wind">-- m/s</strong></div>
+                <div><span class="detail-icon rain-icon">♧</span><span>강수확률</span><strong id="current-rain-probability">--%</strong></div>
               </div>
-              <p class="weather-source-note">기상청 기준 · 실제 API 연결 전 예시 정보</p>
+              <p class="weather-source-note">Open-Meteo 모델 예보 · 관측소 실측값이 아닙니다.</p>
             </article>
 
             <article class="risk-card card">
-              <div class="card-title-row"><div><span class="section-kicker">TODAY'S INSIGHT</span><h2>오늘의 농작업 브리핑</h2></div><span class="risk-badge"><span></span> 보통</span></div>
+              <div class="card-title-row"><div><span class="section-kicker">TODAY'S INSIGHT</span><h2>오늘의 농작업 브리핑</h2></div><span class="risk-badge"><span></span> 예보 안내</span></div>
               <div class="insight-message">
                 <span class="insight-icon" aria-hidden="true">✦</span>
-                <div><strong>오전 방제 작업은 무난해요</strong><p>오후에는 바람이 강해질 수 있어 작업을 오전 중 마치는 것을 권장해요.</p></div>
+                <div><strong id="insight-title">실제 예보를 불러오는 중입니다</strong><p id="insight-description">예보가 도착하면 오늘의 기온·바람·강수를 표시합니다.</p></div>
               </div>
               <div class="insight-bottom">
-                <span><span class="mini-weather-icon">↗</span> 오후 최대 풍속 <strong>5.2 m/s</strong></span>
+                <span><span class="mini-weather-icon">↗</span> 오늘 최대 순간풍속 <strong id="insight-max-gust">-- m/s</strong></span>
                 <a href="#farm-work">농작업 가이드 보기 <span>→</span></a>
               </div>
             </article>
@@ -157,67 +157,64 @@
           <section class="metrics-grid" aria-label="주요 기상 지표">
             <article class="metric-card card">
               <div class="metric-heading"><span>최고 기온</span><span class="metric-icon temperature-icon">↗</span></div>
-              <div class="metric-value">21<span>°C</span></div><div class="metric-sub">평년보다 <b class="positive">1.2° 높아요</b></div>
-              <div class="sparkline temp-line"><svg viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true"><path d="M0 25 C15 24 17 20 30 21 S48 13 59 17 77 9 88 12 105 3 120 5" /><path class="spark-fill" d="M0 25 C15 24 17 20 30 21 S48 13 59 17 77 9 88 12 105 3 120 5 V30 H0Z" /></svg></div>
+              <div class="metric-value" id="metric-max-temperature">--<span>°C</span></div><div class="metric-sub" id="metric-temperature-note">예보를 불러오는 중</div>
             </article>
             <article class="metric-card card">
               <div class="metric-heading"><span>풍속</span><span class="metric-icon wind-metric-icon">≋</span></div>
-              <div class="metric-value">2.8<span>m/s</span></div><div class="metric-sub">오후에 <b class="warning">강해질 예정</b></div>
-              <div class="sparkline wind-line"><svg viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true"><path d="M0 24 C12 20 15 24 27 19 S42 17 52 20 68 13 77 16 93 9 102 11 112 4 120 6" /><path class="spark-fill" d="M0 24 C12 20 15 24 27 19 S42 17 52 20 68 13 77 16 93 9 102 11 112 4 120 6 V30 H0Z" /></svg></div>
+              <div class="metric-value" id="metric-max-wind">--<span>m/s</span></div><div class="metric-sub" id="metric-wind-note">예보를 불러오는 중</div>
             </article>
             <article class="metric-card card">
               <div class="metric-heading"><span>예상 강수량</span><span class="metric-icon rain-metric-icon">⌁</span></div>
-              <div class="metric-value">0<span>mm</span></div><div class="metric-sub">오늘은 <b class="positive">비 소식 없어요</b></div>
-              <div class="sparkline rain-line"><svg viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true"><path d="M0 25 C15 25 15 23 30 24 S46 22 58 23 76 21 87 23 105 20 120 21" /><path class="spark-fill" d="M0 25 C15 25 15 23 30 24 S46 22 58 23 76 21 87 23 105 20 120 21 V30 H0Z" /></svg></div>
+              <div class="metric-value" id="metric-rainfall">--<span>mm</span></div><div class="metric-sub" id="metric-rain-note">예보를 불러오는 중</div>
             </article>
             <article class="metric-card card">
               <div class="metric-heading"><span>일조 시간</span><span class="metric-icon sun-metric-icon">☼</span></div>
-              <div class="metric-value">7.5<span>시간</span></div><div class="metric-sub">작물 생육에 <b class="positive">좋은 조건</b></div>
-              <div class="sun-hours"><span>일출 06:51</span><span class="sun-hours-track"><i></i></span><span>일몰 17:32</span></div>
+              <div class="metric-value" id="metric-sunshine">--<span>시간</span></div><div class="metric-sub" id="metric-sunshine-note">예보를 불러오는 중</div>
+              <div class="sun-hours"><span id="sunrise-time">일출 --:--</span><span class="sun-hours-track"><i></i></span><span id="sunset-time">일몰 --:--</span></div>
             </article>
           </section>
 
           <section class="comparison-section card section-card" id="comparison">
             <div class="section-header">
-              <div><div class="section-kicker">FORECAST COMPARISON</div><h2>기상기관별 예보 비교 <span class="info-tip" title="같은 지역과 시간 기준의 예보 예시입니다.">i</span></h2><p>같은 지역, 같은 시간 기준으로 예보를 비교해보세요.</p></div>
+              <div><div class="section-kicker">FORECAST COMPARISON</div><h2>기상기관별 예보 비교 <span class="info-tip" title="같은 지역·가장 가까운 공통 예보 시각으로 비교합니다.">i</span></h2><p>기상청 초단기예보와 Windy GFS를 Open-Meteo 보조 예보와 함께 확인하세요.</p></div>
               <div class="comparison-controls">
-                <span class="comparison-time"><span>◷</span> 오늘 11:00 기준</span>
+                <span class="comparison-time" id="comparison-time"><span>◷</span> 예보 대기 중</span>
                 <button class="text-button" id="detail-toggle">상세 비교 <span>→</span></button>
               </div>
             </div>
             <div class="provider-cards">
               <article class="provider-card kma-card">
-                <div class="provider-head"><span class="provider-logo kma-logo">K</span><span class="provider-name">기상청 <small>KMA</small></span><span class="provider-live">예시</span></div>
-                <div class="provider-temp">18.5<span>°</span></div>
-                <div class="provider-condition"><span class="tiny-cloud"></span> 구름 조금</div>
-                <div class="provider-foot"><span>체감온도</span><strong>18.1°C</strong></div>
+                <div class="provider-head"><span class="provider-logo kma-logo">K</span><span class="provider-name">기상청 <small>KMA</small></span><span class="provider-live">미연결</span></div>
+                <div class="provider-temp provider-unavailable">연결 안 됨</div>
+                <div class="provider-condition">API 설정 후 표시</div>
+                <div class="provider-foot"><span>실황 시각</span><strong>--</strong></div>
               </article>
               <article class="provider-card windy-card">
-                <div class="provider-head"><span class="provider-logo windy-logo">W</span><span class="provider-name">Windy <small>WINDY.COM</small></span><span class="provider-live">예시</span></div>
-                <div class="provider-temp">19.2<span>°</span></div>
-                <div class="provider-condition"><span class="tiny-cloud"></span> 구름 조금</div>
-                <div class="provider-foot"><span>체감온도</span><strong>18.8°C</strong></div>
+                <div class="provider-head"><span class="provider-logo windy-logo">W</span><span class="provider-name">Windy <small>GFS MODEL</small></span><span class="provider-live" id="windy-provider-status">연결 확인 중</span></div>
+                <div class="provider-temp provider-unavailable">연결 안 됨</div>
+                <div class="provider-condition">API 키 설정 후 표시</div>
+                <div class="provider-foot"><span>돌풍</span><strong>--</strong></div>
               </article>
-              <article class="provider-card meteо-card">
-                <div class="provider-head"><span class="provider-logo meteo-logo">M</span><span class="provider-name">Open-Meteo <small>OPEN SOURCE</small></span><span class="provider-live">예시</span></div>
-                <div class="provider-temp">18.9<span>°</span></div>
-                <div class="provider-condition"><span class="tiny-cloud"></span> 구름 조금</div>
-                <div class="provider-foot"><span>체감온도</span><strong>18.4°C</strong></div>
+              <article class="provider-card open-meteo-card">
+                <div class="provider-head"><span class="provider-logo meteo-logo">M</span><span class="provider-name">Open-Meteo <small>OPEN-METEO</small></span><span class="provider-live" id="open-meteo-provider-status">연결 중</span></div>
+                <div class="provider-temp">--<span>°</span></div>
+                <div class="provider-condition">예보 대기 중</div>
+                <div class="provider-foot"><span>체감온도</span><strong>--</strong></div>
               </article>
             </div>
             <div class="table-wrap">
               <table class="comparison-table">
                 <thead><tr><th>기상 요소</th><th><span class="table-dot kma-dot"></span>기상청</th><th><span class="table-dot windy-dot"></span>Windy</th><th><span class="table-dot meteo-dot"></span>Open-Meteo</th><th>차이</th></tr></thead>
                 <tbody>
-                  <tr><td>기온</td><td>18.5°C</td><td>19.2°C</td><td>18.9°C</td><td><span class="difference-pill">0.7°</span></td></tr>
-                  <tr><td>풍속</td><td>2.4 m/s</td><td>3.1 m/s</td><td>2.8 m/s</td><td><span class="difference-pill">0.7 m/s</span></td></tr>
-                  <tr><td>습도</td><td>65%</td><td>62%</td><td>64%</td><td><span class="difference-pill">3%</span></td></tr>
-                  <tr><td>강수확률</td><td>20%</td><td>10%</td><td>15%</td><td><span class="difference-pill">10%</span></td></tr>
-                  <tr><td>강수량</td><td>0 mm</td><td>0 mm</td><td>0 mm</td><td><span class="difference-pill calm">일치</span></td></tr>
+                  <tr data-weather="temperature"><td>기온</td><td>미연결</td><td>미연결</td><td>--</td><td>비교 불가</td></tr>
+                  <tr data-weather="wind"><td>풍속</td><td>미연결</td><td>미연결</td><td>--</td><td>비교 불가</td></tr>
+                  <tr data-weather="humidity"><td>습도</td><td>미연결</td><td>미연결</td><td>--</td><td>비교 불가</td></tr>
+                  <tr data-weather="rainProbability"><td>강수확률</td><td>미연결</td><td>미연결</td><td>--</td><td>비교 불가</td></tr>
+                  <tr data-weather="precipitation"><td>강수량 (누적기간 상이)</td><td>미연결</td><td>미연결</td><td>--</td><td>직접 비교 불가</td></tr>
                 </tbody>
               </table>
             </div>
-            <div class="comparison-note"><span class="note-icon">i</span> 실제 API 연결 전 화면 설계용 수치입니다. 기관별 예보 시각과 기준이 다를 수 있습니다.</div>
+            <div class="comparison-note"><span class="note-icon">i</span> 공통 시각 기준으로 기상청 초단기예보·Windy GFS·Open-Meteo 모델을 비교합니다. 기상청 초단기실황은 별도 표시하며, 강수량처럼 누적기간이 다른 값은 차이를 계산하지 않습니다. API 키가 설정되지 않은 기관은 미연결로 표시됩니다.</div>
           </section>
 
           <section class="middle-grid">
@@ -240,7 +237,7 @@
                   <span>지도 SDK를 불러오고 있습니다.</span>
                 </div>
               </div>
-              <div class="map-legend"><span id="map-legend-title">기온</span><i class="legend-gradient"></i><span id="map-legend-range">10° — 25°</span><span class="map-legend-note">지역 예시 데이터</span></div>
+              <div class="map-legend"><span id="map-legend-title">기온</span><i class="legend-gradient"></i><span id="map-legend-range">데이터 대기 중</span><span class="map-legend-note">Open-Meteo 예보</span></div>
             </article>
 
             <article class="hourly-card card section-card" id="hourly">
@@ -249,26 +246,19 @@
                 <a class="text-button" href="#weekly">주간 예보 <span>→</span></a>
               </div>
               <div class="hourly-chart">
-                <div class="chart-y-labels"><span>24°</span><span>20°</span><span>16°</span><span>12°</span></div>
+                <div class="chart-y-labels"><span>--°</span><span>--°</span><span>--°</span><span>--°</span></div>
                 <svg viewBox="0 0 500 145" preserveAspectRatio="none" role="img" aria-label="시간별 기온 예보 그래프">
                   <defs><linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffb24f" stop-opacity=".2"/><stop offset="1" stop-color="#ffb24f" stop-opacity="0"/></linearGradient></defs>
                   <path class="chart-gridline" d="M0 16H500M0 52H500M0 88H500M0 124H500" />
-                  <path class="chart-area" d="M0 96 C34 88 45 75 83 80 S133 75 166 61 211 49 250 57 294 66 333 52 376 37 416 45 464 34 500 29 V130H0Z" />
-                  <path class="chart-temp-line" d="M0 96 C34 88 45 75 83 80 S133 75 166 61 211 49 250 57 294 66 333 52 376 37 416 45 464 34 500 29" />
-                  <circle class="chart-current-point" cx="166" cy="61" r="4.5" />
-                  <path class="chart-rain-line" d="M0 117 C55 116 84 118 125 116 S198 114 250 116 314 117 375 115 442 118 500 116" />
+                  <path class="chart-area" d="" />
+                  <path class="chart-temp-line" d="" />
+                  <circle class="chart-current-point" cx="0" cy="0" r="4.5" />
+                  <path class="chart-rain-line" d="" />
                 </svg>
-                <div class="chart-current-label">19°</div>
+                <div class="chart-current-label">--°</div>
               </div>
-              <div class="chart-time-labels"><span>06시</span><span>09시</span><span>12시</span><span>15시</span><span>18시</span><span>21시</span></div>
-              <div class="hourly-conditions">
-                <div><span>06시</span><i class="mini-cloud"></i><strong>14°</strong><small>0%</small></div>
-                <div><span>09시</span><i class="mini-sun-cloud"></i><strong>17°</strong><small>5%</small></div>
-                <div class="hour-now"><span>12시</span><i class="mini-sun"></i><strong>19°</strong><small>10%</small></div>
-                <div><span>15시</span><i class="mini-sun-cloud"></i><strong>21°</strong><small>10%</small></div>
-                <div><span>18시</span><i class="mini-cloud"></i><strong>18°</strong><small>15%</small></div>
-                <div><span>21시</span><i class="mini-moon"></i><strong>15°</strong><small>5%</small></div>
-              </div>
+              <div class="chart-time-labels"></div>
+              <div class="hourly-conditions" aria-live="polite">시간별 예보 대기 중</div>
               <div class="chart-legend"><span><i class="legend-temperature"></i>기온</span><span><i class="legend-rain"></i>강수확률</span></div>
             </article>
           </section>
@@ -283,43 +273,30 @@
                 </button>
               </div>
             </div>
-            <div class="crop-context"><span class="crop-icon">♧</span><span><strong>사과</strong> 기준 · 생육기</span><span class="crop-context-divider"></span><span>지역 기상 예시 기반</span></div>
+            <div class="crop-context"><span class="crop-icon">♧</span><span><strong>작물 설정 없음</strong> · 생육단계 미입력</span><span class="crop-context-divider"></span><span id="farm-data-source">예보 대기 중</span></div>
             <div class="farm-work-grid">
-              <article class="work-card work-good"><div class="work-icon spray-icon">⌁</div><div class="work-label">농약 살포</div><span class="work-status status-good">오전 권장</span><p>오전은 풍속이 낮고 강수 가능성이 적어요.</p><div class="work-reason"><span>풍속</span><strong>2.4 m/s</strong><span>강수확률</span><strong>10%</strong></div></article>
-              <article class="work-card work-caution"><div class="work-icon irrigation-icon">⌁</div><div class="work-label">관수</div><span class="work-status status-caution">필요 여부 확인</span><p>오늘 비 소식은 없지만 토양 상태를 확인해 주세요.</p><div class="work-reason"><span>예상 강수</span><strong>0 mm</strong><span>습도</span><strong>64%</strong></div></article>
-              <article class="work-card work-good"><div class="work-icon seed-icon">♧</div><div class="work-label">파종 · 정식</div><span class="work-status status-good">조건 양호</span><p>온화한 기온으로 작업하기 좋은 날이에요.</p><div class="work-reason"><span>기온</span><strong>18.5°C</strong><span>강수확률</span><strong>15%</strong></div></article>
-              <article class="work-card work-caution"><div class="work-icon harvest-icon">◉</div><div class="work-label">수확</div><span class="work-status status-caution">오전 권장</span><p>오후 습도가 높아지기 전 수확을 권장해요.</p><div class="work-reason"><span>습도</span><strong>64%</strong><span>일조</span><strong>7.5시간</strong></div></article>
+              <article class="work-card"><div class="work-icon spray-icon">⌁</div><div class="work-label">농약 살포</div><span class="work-status">제품 기준 확인</span><p>예보 풍속·돌풍·강수와 제품 표시사항을 확인하세요.</p><div class="work-reason"><span>풍속</span><strong>--</strong><span>강수확률</span><strong>--</strong></div></article>
+              <article class="work-card"><div class="work-icon irrigation-icon">⌁</div><div class="work-label">관수</div><span class="work-status">토양 상태 확인</span><p>예상 강수와 증발산량을 참고하고 토양을 확인하세요.</p><div class="work-reason"><span>예상 강수</span><strong>--</strong><span>ET₀</span><strong>--</strong></div></article>
+              <article class="work-card"><div class="work-icon seed-icon">♧</div><div class="work-label">파종 · 정식</div><span class="work-status">작물 기준 확인</span><p>기온·지표면 온도 예보만 표시합니다. 작물별 기준을 확인하세요.</p><div class="work-reason"><span>기온</span><strong>--</strong><span>지표면 온도</span><strong>--</strong></div></article>
+              <article class="work-card"><div class="work-icon harvest-icon">◉</div><div class="work-label">수확</div><span class="work-status">현장 상태 확인</span><p>강수와 일조 예보입니다. 실제 작물·토양 상태를 확인하세요.</p><div class="work-reason"><span>강수</span><strong>--</strong><span>일조</span><strong>--</strong></div></article>
             </div>
-            <div class="farm-disclaimer"><span>ⓘ</span> 농작업 안내는 예시 기상정보를 바탕으로 한 참고용이며, 실제 작업 전 작물·농약 제품의 사용 기준과 현장 조건을 반드시 확인하세요.</div>
+            <div class="farm-disclaimer"><span>ⓘ</span> Open-Meteo는 모델 기반 예보이며 농장 현장 관측이 아닙니다. 작물·농약별 안전 기준이나 토양수분 센서값은 연결되어 있지 않으므로 반드시 제품 표시사항과 현장을 확인하세요.</div>
           </section>
 
           <section class="bottom-grid">
             <article class="weekly-card card section-card" id="weekly">
-              <div class="section-header compact-header"><div><div class="section-kicker">7-DAY FORECAST</div><h2>주간 예보</h2></div><span class="weekly-location">공주시 · 예시</span></div>
-              <div class="week-list">
-                <div class="week-day"><span class="day-name">오늘 <small>11/03</small></span><i class="mini-sun-cloud"></i><span class="week-condition">구름 조금</span><span class="week-rain">10%</span><strong>21° <span>12°</span></strong></div>
-                <div class="week-day"><span class="day-name">수 <small>11/04</small></span><i class="mini-sun"></i><span class="week-condition">맑음</span><span class="week-rain">0%</span><strong>22° <span>11°</span></strong></div>
-                <div class="week-day"><span class="day-name">목 <small>11/05</small></span><i class="mini-sun-cloud"></i><span class="week-condition">구름 많음</span><span class="week-rain">10%</span><strong>20° <span>12°</span></strong></div>
-                <div class="week-day"><span class="day-name">금 <small>11/06</small></span><i class="mini-rain"></i><span class="week-condition">비</span><span class="week-rain rain-likely">60%</span><strong>17° <span>13°</span></strong></div>
-                <div class="week-day"><span class="day-name">토 <small>11/07</small></span><i class="mini-cloud"></i><span class="week-condition">흐림</span><span class="week-rain">20%</span><strong>18° <span>10°</span></strong></div>
-                <div class="week-day"><span class="day-name">일 <small>11/08</small></span><i class="mini-sun"></i><span class="week-condition">맑음</span><span class="week-rain">0%</span><strong>19° <span>9°</span></strong></div>
-                <div class="week-day"><span class="day-name">월 <small>11/09</small></span><i class="mini-sun-cloud"></i><span class="week-condition">구름 조금</span><span class="week-rain">10%</span><strong>20° <span>10°</span></strong></div>
-              </div>
+              <div class="section-header compact-header"><div><div class="section-kicker">7-DAY FORECAST</div><h2>주간 예보</h2></div><span class="weekly-location">예보 대기 중</span></div>
+              <div class="week-list" aria-live="polite">주간 예보 대기 중</div>
             </article>
 
             <article class="accuracy-card card section-card" id="accuracy">
-              <div class="section-header compact-header"><div><div class="section-kicker">FORECAST ACCURACY</div><h2>예보 정확도</h2></div><button class="select-button accuracy-period">최근 7일 <span>⌄</span></button></div>
-              <p class="accuracy-description">예보와 관측값의 차이를 비교해요.</p>
-              <div class="accuracy-score-row"><div><span>기온 예보 평균 오차</span><strong>1.4<span>°C</span></strong></div><span class="accuracy-change">지난주보다 0.3° 개선</span></div>
-              <div class="accuracy-bars">
-                <div><span>기상청</span><div class="accuracy-track"><i style="width: 82%"></i></div><strong>1.2°</strong></div>
-                <div><span>Windy</span><div class="accuracy-track windy-track"><i style="width: 73%"></i></div><strong>1.6°</strong></div>
-                <div><span>Open-Meteo</span><div class="accuracy-track meteo-track"><i style="width: 78%"></i></div><strong>1.4°</strong></div>
-              </div>
-              <div class="accuracy-footnote">* 과거 예보와 실제 관측 비교 기능은 데이터 연동 후 제공됩니다.</div>
+              <div class="section-header compact-header"><div><div class="section-kicker">FORECAST ACCURACY</div><h2>예보 정확도</h2></div></div>
+              <p class="accuracy-description">실제 관측과 과거 예보 자료가 모두 있어야 정확도를 계산할 수 있습니다.</p>
+              <div class="accuracy-unavailable">관측소 실측 및 과거 예보 이력이 연결되지 않아 정확도를 산출할 수 없습니다.</div>
+              <div class="accuracy-footnote">현재 제공되는 값은 Open-Meteo의 최신 모델 예보입니다. 실제 관측값으로 표시하지 않습니다.</div>
             </article>
           </section>
-          <footer class="page-footer"><span>하늘밭 농업 기상 플랫폼</span><span>정확한 농작업 판단을 위해 현장 관측과 함께 활용하세요.</span></footer>
+          <footer class="page-footer"><span>하늘밭 농업 기상 플랫폼 · 자료 제공 <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">Open-Meteo</a></span><span>정확한 농작업 판단을 위해 현장 관측과 함께 활용하세요.</span></footer>
         </div>
       </main>
     </div>
@@ -342,7 +319,7 @@
         <div class="gemini-dialog-actions">
           <button class="gemini-ask-button" id="ask-gemini" type="button"><span aria-hidden="true">✦</span> Gemini에게 질문하기</button>
         </div>
-        <p class="gemini-privacy-note">질문과 화면에 표시된 기상정보가 답변 생성을 위해 Google Gemini로 전송됩니다. 내 위치를 선택한 경우 지역명 또는 좌표도 포함될 수 있습니다. 기상정보는 API 연결 전 예시값이므로 실제 작업 전 현장과 최신 예보를 확인하세요.</p>
+        <p class="gemini-privacy-note">질문과 화면의 Open-Meteo 모델 예보가 답변 생성을 위해 Google Gemini로 전송됩니다. 내 위치를 선택하면 좌표도 포함될 수 있습니다. 모델 예보는 관측소 실측값이 아니므로 실제 작업 전 현장을 확인하세요.</p>
       </form>
     </dialog>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
